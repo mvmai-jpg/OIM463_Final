@@ -1,0 +1,283 @@
+---
+title: "Teen Mental Health Analysis"
+author: "Matteo Mai"
+format:
+  dashboard:
+    embed-resources: true
+---
+
+```{r}
+#| warning: false
+#| message: false
+#| context: setup
+
+library(tidyverse)
+library(plotly)
+library(crosstalk)
+library(viridis)
+
+COL_LOW  <- "#2A9D8F"
+COL_MID  <- "#F9C74F"
+COL_HIGH <- "#E63946"
+CAT3     <- c(COL_LOW, COL_MID, COL_HIGH)
+GRADIENT <- colorRampPalette(c("#F9C74F", "#E63946"))(100)
+
+mental_health <- read_csv("~/Downloads/Teen_Mental_Health_Dataset.csv") |>
+  mutate(
+    social_media_bin = cut(daily_social_media_hours,
+                           breaks = c(0, 1, 2, 3, 4, 5, 6, Inf),
+                           labels = c("<1 hr", "1-2 hrs", "2-3 hrs", "3-4 hrs", "4-5 hrs", "5-6 hrs", "6+ hrs"),
+                           include.lowest = TRUE),
+    social_media_level = case_when(
+      daily_social_media_hours < 3 ~ "Low SM (<3 hrs)",
+      daily_social_media_hours < 6 ~ "Medium SM (3-6 hrs)",
+      TRUE ~ "High SM (6+ hrs)"
+    ),
+    social_media_level = factor(social_media_level,
+                                levels = c("Low SM (<3 hrs)", "Medium SM (3-6 hrs)", "High SM (6+ hrs)")),
+    interaction_group = case_when(
+      social_interaction_level %in% c(1, "1", "Low",    "low")                    ~ "Low",
+      social_interaction_level %in% c(2, "2", "Medium", "medium", "Mid", "mid")   ~ "Medium",
+      social_interaction_level %in% c(3, "3", "High",   "high")                   ~ "High",
+      TRUE ~ as.character(social_interaction_level)
+    ),
+    interaction_group = factor(interaction_group, levels = c("Low", "Medium", "High")),
+    age = factor(age)
+  )
+
+sd <- SharedData$new(mental_health)
+```
+
+# Dashboard
+
+## {.sidebar}
+
+```{r}
+filter_slider(
+  id       = "age",
+  label    = "Age",
+  sharedData = sd,
+  column   = ~as.integer(as.character(age)),
+  step     = 1
+)
+```
+
+## Row {height="50%"}
+
+### Social Media Use and Anxiety {width="50%"}
+
+```{r}
+#| warning: false
+#| message: false
+#| title: "Anxiety Level by Daily Social Media Use"
+
+plot_ly(sd,
+        x = ~social_media_bin,
+        y = ~anxiety_level,
+        color = ~social_media_bin,
+        colors = colorRampPalette(CAT3)(7),
+        type = "box",
+        hoverinfo = "y") |>
+  layout(
+    xaxis = list(title = "Daily Social Media Use",
+                 categoryorder = "array",
+                 categoryarray = c("<1 hr","1-2 hrs","2-3 hrs","3-4 hrs","4-5 hrs","5-6 hrs","6+ hrs")),
+    yaxis = list(title = "Anxiety Level (1-10)"),
+    showlegend = FALSE,
+    paper_bgcolor = "rgba(0,0,0,0)",
+    plot_bgcolor  = "rgba(0,0,0,0)"
+  )
+```
+
+### Social Media Use vs. Social Interaction Level {width="50%"}
+
+```{r}
+#| warning: false
+#| message: false
+#| title: "Social Media Use by Social Interaction Level"
+
+plot_ly(sd,
+        x = ~interaction_group,
+        color = ~social_media_level,
+        colors = CAT3,
+        type = "histogram",
+        hoverinfo = "x+y") |>
+  layout(
+    xaxis = list(title = "Social Interaction Level",
+                 categoryorder = "array",
+                 categoryarray = c("Low", "Medium", "High")),
+    yaxis = list(title = "Number of Teens"),
+    barmode = "group",
+    legend = list(title = list(text = "Social Media Use")),
+    paper_bgcolor = "rgba(0,0,0,0)",
+    plot_bgcolor  = "rgba(0,0,0,0)"
+  )
+```
+
+## Row {height="50%"}
+
+### Anxiety vs. Addiction {width="50%"}
+
+```{r}
+#| warning: false
+#| message: false
+#| title: "Anxiety Level vs. Addiction Level"
+
+plot_ly(sd,
+        x = ~anxiety_level,
+        y = ~addiction_level,
+        color = ~anxiety_level,
+        colors = GRADIENT,
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 5, opacity = 0.5),
+        text = ~paste("Anxiety:", anxiety_level,
+                      "<br>Addiction:", addiction_level),
+        hoverinfo = "text") |>
+  layout(
+    xaxis = list(title = "Anxiety Level (1-10)",
+                 tickmode = "linear", tick0 = 1, dtick = 1),
+    yaxis = list(title = "Addiction Level (1-10)",
+                 tickmode = "linear", tick0 = 1, dtick = 1),
+    showlegend = FALSE,
+    paper_bgcolor = "rgba(0,0,0,0)",
+    plot_bgcolor  = "rgba(0,0,0,0)"
+  )
+```
+
+### Age vs. Daily Social Media Hours {width="50%"}
+
+```{r}
+#| warning: false
+#| message: false
+#| title: "Daily Social Media Hours by Age"
+
+n_ages <- n_distinct(mental_health$age)
+
+plot_ly(sd,
+        x = ~age,
+        y = ~daily_social_media_hours,
+        color = ~age,
+        colors = colorRampPalette(CAT3)(n_ages),
+        type = "box",
+        hoverinfo = "y") |>
+  layout(
+    xaxis = list(title = "Age"),
+    yaxis = list(title = "Daily Social Media Hours"),
+    showlegend = FALSE,
+    paper_bgcolor = "rgba(0,0,0,0)",
+    plot_bgcolor  = "rgba(0,0,0,0)"
+  )
+```
+
+# Introduction
+
+## Row
+
+::: {.card}
+
+## About This Project
+
+This project investigates the relationship between social media habits and mental health outcomes in teenagers. The dataset "the Teen Mental Health Dataset" contains self-reported survey responses from adolescents across a range of ages, capturing behavioral patterns like daily social media use, physical activity, sleep, and screen time alongside psychological outcome measures including anxiety level, stress level, addiction level, and a binary depression label. The goal of this analysis is not simply to describe what teens report, but to look for patterns across multiple variables simultaneously and to understand how different risk factors interact.
+
+Mental health among teenagers has emerged as one of the most pressing public health concerns of the past decade. Rates of anxiety, depression, and loneliness among adolescents have risen sharply since the widespread adoption of smartphones and social media platforms. While correlation does not imply causation, the behavioral and psychological variables captured in this dataset offer a rich opportunity to explore which patterns appear most consistently and which combinations of factors seem to place teenagers at greatest risk.
+
+The dataset includes variables across several categories. Behavioral inputs include daily social media hours, platform used, physical activity, sleep hours, and screen time before bed. Social variables include a self-reported social interaction level categorized as low, medium, or high. Mental health outcome variables include anxiety level on a 1–10 scale, stress level on a 1–10 scale, addiction level on a 1–10 scale, and a binary depression label indicating whether a respondent met the threshold for depression. Age is also recorded, allowing for developmental comparisons across the teenage years.
+
+The analysis presented in this dashboard focuses on four core relationships: how daily social media use relates to anxiety, how social media consumption maps onto social interaction, how anxiety and addiction co-occur, and how social media habits evolve with age. Each question was chosen because it addresses a different dimension of the mental health picture: individual psychological outcomes, social behavior, co-occurring risk factors, and developmental trajectory. Together, they provide a multi-angle view of a dataset that resists any single, simple narrative.
+
+:::
+
+# Research Questions
+
+## Row
+
+::: {.card}
+
+## The Questions Driving This Analysis
+
+Every visualization in this dashboard was built around a specific question. Those questions did not emerge arbitrarily, they reflect assumptions worth testing, patterns that prior research has hinted at, and relationships that matter practically for understanding teen wellbeing.
+
+**Question 1: Does more daily social media use correspond to higher anxiety?** This is perhaps the most commonly assumed relationship in public discourse about teen mental health. Parents, educators, and policymakers frequently invoke it, but the data often tells a more complicated story. A simple upward trend across all hours of use would confirm the popular narrative. But the distribution of anxiety scores at each usage level, not just the average, matters more. If teens who use social media for six or more hours a day show dramatically wider variance in anxiety, that suggests social media is not uniformly harmful but that it interacts with other individual factors. This visualization was designed to reveal that distributional nuance rather than flatten it into a single number.
+
+**Question 2: Is there a relationship between how much social media teens use and how much they interact socially in person?** The hypothesis here is intuitive: if teens are spending more hours online, they may be spending fewer hours in face-to-face social contexts, and lower social interaction could compound the psychological risks of heavy social media use. But the relationship might not be cleanly inverse. Some teens may use social media as a supplement to robust social lives rather than a replacement. The grouped bar chart tests whether low-interaction teens are disproportionately concentrated in the high social media usage category, or whether usage is more evenly distributed across interaction levels.
+
+**Question 3: Do anxiety and addiction levels rise together, or do they dissociate?** Anxiety and social media addiction are often treated as a package deal in the research literature, but this assumes a tight coupling that may not always exist. Some teens may report high anxiety without high addiction, perhaps their anxiety stems from sources unrelated to social media. Others may show high addiction without proportionally high anxiety: perhaps they are compulsive users who nonetheless experience little psychological distress. The scatter plot of raw data points allows both the overall correlation and the exceptions to be visible simultaneously.
+
+**Question 4: How does social media use change across ages?** Teenagers are not a monolithic group. A 13-year-old and a 19-year-old inhabit very different developmental moments, with different levels of autonomy, different peer pressures, and different relationships to technology. If social media use climbs steadily with age, that may reflect growing independence and access to devices. If it peaks in the middle teen years and then declines, that could reflect shifting priorities as older teens take on work, driving, and other offline commitments. The box plot by age captures not just the central tendency but the spread of habits within each year of age.
+
+:::
+
+# Findings: Social Media & Anxiety
+
+## Row
+
+::: {.card}
+
+## What the Data Shows About Social Media Use and Anxiety
+
+The first visualization plots the distribution of anxiety scores across seven bins of daily social media use, from under one hour to six or more hours per day. The chart uses box plots rather than simple bar heights for a deliberate reason: the median alone is a poor summary of anxiety, which is a highly variable and individual experience. The box at each usage level shows where the middle 50% of respondents cluster, while the whiskers and outliers reveal the tails of the distribution.
+
+Several patterns are worth examining carefully. If the median anxiety score rises consistently from left to right across the bins, that would constitute straightforward evidence for a dose-response relationship between social media use and anxiety. More use, more anxiety, with each additional hour of daily use adding to the psychological burden. A dose-response relationship of this kind is typically treated as stronger evidence of a real underlying association than a simple correlation, because it suggests a gradient rather than a binary effect.
+
+However, the distributional shape of each box matters as much as the median. Wide boxes at the high-use end of the spectrum would indicate that heavy social media users are not uniformly anxious; some are, and some are not. That raises the question of what distinguishes them. Narrow boxes would suggest that high use is consistently associated with a particular anxiety range, leaving less room for individual variation. The presence or absence of outliers at the low end of the high-use bins, teens who use social media heavily but report very low anxiety. That is also theoretically important, as it would represent evidence that some teenagers appear resistant to the psychological costs of heavy use.
+
+It is also worth noting what the age slider in the dashboard reveals about this relationship. Filtering down to younger teens versus older teens may shift the distributions substantially. If the association between social media use and anxiety is stronger in younger adolescents, that would suggest developmental vulnerability that the teenage brain at 13 or 14 may be more susceptible to the psychological effects of social media than at 17 or 18. This kind of age-moderated relationship is one of the most important and underexplored questions in the adolescent mental health literature.
+
+:::
+
+# Findings: Social Interaction Patterns
+
+## Row
+
+::: {.card}
+
+## What the Data Shows About Social Media Use and Social Interaction
+
+The second visualization approaches the social media question from a different angle. Rather than asking what social media does to psychological outcomes like anxiety, it asks what social media use looks like across different levels of in-person social engagement. The grouped bar chart shows the count of teens in each combination of social interaction level (low, medium, high) and social media usage tier (under three hours, three to six hours, six or more hours per day).
+
+The displacement hypothesis, the idea that online activity crowds out offline social life predicts a specific pattern in this chart: low-interaction teens should be overrepresented in the high social media category, while high-interaction teens should be concentrated in the low social media category. If this pattern holds cleanly, it would be a striking finding. It would suggest that social media is not simply something teens use alongside their social lives but is actually competing with face-to-face connection for time and attention, and that teens who have ended up on one side of the usage spectrum tend not to be on the other side of the interaction spectrum.
+
+The alternative pattern, that usage is roughly evenly distributed across interaction levels would undercut the displacement hypothesis and instead support the supplementation model. In this reading, social media is simply a tool that teens with active social lives use to extend and maintain those connections, while teens with limited social interaction use it to fill a different need. The psychological implications of these two patterns are very different. Displacement suggests that social media is part of the causal chain leading to isolation. Supplementation suggests that pre-existing social disconnection drives heavy use, rather than the reverse.
+
+The age slider adds another layer of interpretive possibility here. Among very young teens, social interaction may be more peer-structured and school-dependent, meaning that the link between low in-person interaction and high social media use might be especially pronounced. Older teens, with more independent social lives, may show a looser relationship between the two variables. Filtering the chart by age group transforms it from a static snapshot into a window onto how the relationship between online and offline sociality evolves across adolescent development.
+
+:::
+
+# Findings: Anxiety, Addiction & Age
+
+## Row
+
+::: {.card}
+
+## What the Data Shows About Co-Occurring Risk Factors and Age
+
+The third visualization is a raw scatter plot of anxiety level against addiction level, with each point representing one teen in the dataset. Unlike the other charts, nothing is aggregated or summarized, every respondent appears as their own dot, colored along the yellow-to-red gradient by their anxiety score. This design choice was intentional. The goal is not to describe the average teen but to make the full joint distribution visible: where do most teens cluster, and where are the outliers?
+
+If anxiety and addiction are tightly coupled, the scatter plot should show a dense diagonal band running from the lower-left to the upper-right. Teens who report low addiction would cluster at low anxiety, and teens who report high addiction would cluster at high anxiety, with relatively few points far from the diagonal. A tight diagonal would support the idea that these two dimensions of wellbeing move together and that a teen's position on one scale is a strong predictor of their position on the other.
+
+But scatter plots are most useful precisely when the reality is messier than that. A diagonal smear of points, where the relationship is positive but weak, and where many teens fall well off the diagonal tells a more complex story. It says that anxiety and addiction share some variance but also diverge meaningfully. A teen in the upper-left quadrant: high anxiety, low addiction. They would be someone experiencing significant psychological distress without a corresponding level of compulsive social media use. A teen in the lower-right with high addiction, low anxiety, would represent the opposite case: compulsive use that does not translate into clinical anxiety levels. Both of these off-diagonal populations are theoretically important and practically significant for intervention design.
+
+The fourth visualization takes a step back from psychological outcomes and looks instead at behavior across the lifespan of adolescence. The box plot of daily social media hours by age captures how a single behavioral variable is distributed within each year of teenage life. The central question is whether social media use is essentially uniform across the teen years or whether it follows a developmental arc. If use increases monotonically with age, the most likely explanation is access and autonomy: older teens have more unsupervised time, fewer parental controls, and more device ownership. If use peaks in the middle years and then drops, it may reflect a phase of heavy engagement during early-to-mid adolescence that gives way to other priorities as teens approach adulthood. The width of the boxes within each age group also captures whether teens within a given year are more or less homogeneous in their habits, or whether there is substantial spread that defies age-based generalization.
+
+:::
+
+# Design Decisions
+
+## Row
+
+::: {.card}
+
+## Why the Dashboard Looks the Way It Does
+
+Every visual and structural choice in this dashboard reflects a deliberate decision about how to communicate the data honestly and legibly. Those decisions deserve explanation, because design is not decoration, it is argument.
+
+**Color palette.** The dashboard uses a three-color system anchored in teal (`#2A9D8F`), yellow (`#F9C74F`), and red (`#E63946`). This palette was chosen for two reasons. First, it carries intuitive meaning: teal reads as neutral or positive, yellow as intermediate, and red as high-risk or concerning. In a dataset about mental health, where some values represent better outcomes and others represent worse ones, color that tracks meaning reduces the cognitive load on the viewer. Second, the palette provides enough contrast to be readable without being visually loud. For charts with sequential data, like the anxiety-by-usage box plots the colors form a smooth gradient from teal through yellow to red. For categorical data like the social media usage tiers in the grouped histogram; the three colors function as distinct but harmonious labels. The dot plot and box plots use the full gradient mapped to the underlying data value, so color reinforces rather than duplicates the positional encoding.
+
+**Chart type selection.** Each visualization was matched to the structure of its data. Box plots were chosen for the anxiety-by-usage and social-media-by-age charts because both involve a continuous outcome variable distributed across discrete categories, and the distribution is substantively important. Charts that show only averages systematically hide variance, and in mental health data, variance is meaningful: knowing that the average anxiety score is 6 tells you very little if some teens score 2 and others score 10. The grouped histogram for social media use by interaction level uses counts rather than proportions because the absolute size of each group matters, a pattern that holds in a small subgroup is less compelling than one that holds across hundreds of teens. The scatter plot for anxiety versus addiction was chosen specifically to preserve the joint distribution of two continuous variables, making both the overall trend and the individual exceptions visible simultaneously.
+
+**Dashboard layout.** The two-by-two grid arranges the charts so that thematically related panels are adjacent. The top row holds both social media charts, the one linking use to anxiety and the one linking use to social interaction because they share a common independent variable and invite direct comparison. The bottom row holds the more individual-level analyses. The co-occurrence of anxiety and addiction, and the developmental trajectory of social media use are conceptually downstream of the top-row questions. The sidebar age slider applies to all four charts simultaneously via a crosstalk SharedData object, so filtering by age transforms the entire dashboard at once rather than requiring the viewer to re-examine four separate charts independently.
+
+**Interactivity.** The decision to link all charts through a single age filter rather than multiple filters was deliberate. In an earlier version of the dashboard, filters for platform, social interaction level, and social media hours were all present. But multiple simultaneous filters create a combinatorial explosion of possible views, most of which are populated by too few data points to be meaningful. The age filter was retained as the sole control because age is the variable most likely to produce substantively different patterns across its range, and because filtering by age does not risk fragmenting the data to the point of uninterpretability. Hover tooltips on all charts provide row-level detail on demand without cluttering the static view.
+
+:::
