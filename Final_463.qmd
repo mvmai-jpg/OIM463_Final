@@ -1,6 +1,6 @@
 ---
 title: "Teen Mental Health Analysis"
-author: "Matteo Mai"
+author: "Matteo Mai, Aaron Chen, Yadi Sheng"
 format:
   dashboard:
     embed-resources: true
